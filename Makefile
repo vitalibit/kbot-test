@@ -11,8 +11,11 @@ linux:
 arm:
 	GOOS=linux GOARCH=arm64 go build -o bin/$(APP)-linux-arm64 main.go
 
-macos:
+macos-amd:
 	GOOS=darwin GOARCH=amd64 go build -o bin/$(APP)-darwin-amd64 main.go
+
+macos-arm:
+	GOOS=darwin GOARCH=arm64 go build -o bin/$(APP)-darwin-arm64 main.go
 
 windows:
 	GOOS=windows GOARCH=amd64 go build -o bin/$(APP)-windows-amd64.exe main.go
