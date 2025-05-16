@@ -1,5 +1,5 @@
 APP := task3
-REGISTRY ?= ghcr.io/bwoogmy
+REGISTRY ?= ghcr.io/yourusername
 VERSION ?= latest
 IMAGE_TAG ?= $(REGISTRY)/$(APP):$(VERSION)
 
