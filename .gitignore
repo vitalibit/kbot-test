@@ -1,2 +1,5 @@
 .vscode/
 bin/
+.gitignore
+go.mod
+main.go
