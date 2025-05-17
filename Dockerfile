@@ -1,6 +1,6 @@
-FROM quay.io/projectquay/golang:1.22 AS builder
+FROM quay.io/projectquay/golang:1.22 AS build
 
-WORKDIR /src
+WORKDIR /app
 COPY . .
 
 ARG TARGETOS=linux
@@ -9,7 +9,5 @@ ARG TARGETARCH=amd64
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o app main.go
 
 FROM scratch
-WORKDIR /
-COPY --from=builder /src/app .
-COPY --from=alpine:latest /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-ENTRYPOINT ["./app"]
+COPY --from=build /app/app /app
+ENTRYPOINT ["/app"]

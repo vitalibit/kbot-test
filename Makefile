@@ -1,62 +1,37 @@
-APP := task3
+APP      := task3
 REGISTRY ?= ghcr.io/bwoogmy
-VERSION ?= latest
-IMAGE_TAG ?= $(REGISTRY)/$(APP):$(VERSION)
+IMAGE    := $(REGISTRY)/$(APP)
 
-UNAME_S := $(shell uname -s)
-UNAME_M := $(shell uname -m)
+PLATFORMS_LIST = linux_amd64 linux_arm64 darwin_amd64 darwin_arm64 windows_amd64
 
-ifeq ($(UNAME_S),Linux)
-	GOOS := linux
-else ifeq ($(UNAME_S),Darwin)
-	GOOS := darwin
-else ifeq ($(findstring MINGW,$(UNAME_S)),MINGW)
-	GOOS := windows
-else
-	GOOS := linux
-endif
+define build_platform
+build-$(1):
+	docker buildx build \
+		--platform $(subst _,/,$(1)) \
+		--build-arg TARGETOS=$(word 1,$(subst _, ,$(1))) \
+		--build-arg TARGETARCH=$(word 2,$(subst _, ,$(1))) \
+		--output type=local,dest=output/$(1) \
+		-t $(IMAGE):$(1) .
+endef
 
-ifeq ($(UNAME_M),x86_64)
-	GOARCH := amd64
-else ifeq ($(UNAME_M),arm64)
-	GOARCH := arm64
-else
-	GOARCH := amd64
-endif
+$(foreach plat,$(PLATFORMS_LIST),$(eval $(call build_platform,$(plat))))
 
-.PHONY: native linux-amd linux-arm macos-amd macos-arm windows image clean
+.PHONY: all clean $(addprefix build-,$(PLATFORMS_LIST))
 
-native:
-	@echo "Building for current platform: GOOS=$(GOOS), GOARCH=$(GOARCH)"
-	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o bin/$(APP)-$(GOOS)-$(GOARCH) main.go
+all: $(addprefix build-,$(PLATFORMS_LIST))
 
-linux-amd:
-	GOOS=linux GOARCH=amd64 go build -o bin/$(APP)-linux-amd64 main.go
-
-linux-arm:
-	GOOS=linux GOARCH=arm64 go build -o bin/$(APP)-linux-arm64 main.go
-
-macos-amd:
-	GOOS=darwin GOARCH=amd64 go build -o bin/$(APP)-darwin-amd64 main.go
-
-macos-arm:
-	GOOS=darwin GOARCH=arm64 go build -o bin/$(APP)-darwin-arm64 main.go
-
-windows:
-	GOOS=windows GOARCH=amd64 go build -o bin/$(APP)-windows-amd64.exe main.go
-
+# Просто отдельная сборка под linux amd64 и push
 image:
-	docker buildx build --platform $(GOOS)/$(GOARCH) \
-		--build-arg TARGETOS=$(GOOS) \
-		--build-arg TARGETARCH=$(GOARCH) \
-		-t $(IMAGE_TAG)-$(GOOS)-$(GOARCH) --load .
+	docker buildx build \
+		--platform linux/amd64 \
+		--build-arg TARGETOS=linux \
+		--build-arg TARGETARCH=amd64 \
+		-t $(IMAGE):linux_amd64 \
+		--output type=docker .
+
+push:
+	docker push $(IMAGE):linux_amd64
 
 clean:
-	@echo "Cleaning binaries and Docker images..."
-	@rm -rf bin/
-	@docker rmi $(IMAGE_TAG)-linux-amd64 2>/dev/null || true
-	@docker rmi $(IMAGE_TAG)-linux-arm64 2>/dev/null || true
-	@docker rmi $(IMAGE_TAG)-darwin-amd64 2>/dev/null || true
-	@docker rmi $(IMAGE_TAG)-darwin-arm64 2>/dev/null || true
-	@docker rmi $(IMAGE_TAG)-windows-amd64 2>/dev/null || true
-	@docker rmi $(IMAGE_TAG)-$(GOOS)-$(GOARCH) 2>/dev/null || true
+	@rm -rf output/
+	@for p in $(PLATFORMS_LIST); do docker rmi $(IMAGE):$$p || true; done
