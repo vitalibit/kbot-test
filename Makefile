@@ -1,37 +1,31 @@
-APP      := task3
-REGISTRY ?= ghcr.io/bwoogmy
-IMAGE    := $(REGISTRY)/$(APP)
+# ==== Конфігурація ====
+IMAGE_NAME=golang
+REGISTRY=quay.io/yourproject
+BUILDX=buildx
 
-PLATFORMS_LIST = linux_amd64 linux_arm64 darwin_amd64 darwin_arm64 windows_amd64
 
-define build_platform
-build-$(1):
-	docker buildx build \
-		--platform $(subst _,/,$(1)) \
-		--build-arg TARGETOS=$(word 1,$(subst _, ,$(1))) \
-		--build-arg TARGETARCH=$(word 2,$(subst _, ,$(1))) \
-		--output type=local,dest=output/$(1) \
-		-t $(IMAGE):$(1) .
-endef
+PLATFORMS=linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64
 
-$(foreach plat,$(PLATFORMS_LIST),$(eval $(call build_platform,$(plat))))
+.PHONY: all clean $(subst /,_,$(PLATFORMS))
 
-.PHONY: all clean $(addprefix build-,$(PLATFORMS_LIST))
+$(foreach plat,$(PLATFORMS),$(eval $(subst /,_,${plat}): ; docker buildx build --platform ${plat} \
+	--build-arg TARGETOS=$(word 1,$(subst /, ,${plat})) \
+	--build-arg TARGETARCH=$(word 2,$(subst /, ,${plat})) \
+	--output type=local,dest=build/$(subst /,_,${plat}) \
+	--file Dockerfile .))
 
-all: $(addprefix build-,$(PLATFORMS_LIST))
+all: $(subst /,_,${PLATFORMS})
 
-# Просто отдельная сборка под linux amd64 и push
 image:
 	docker buildx build \
 		--platform linux/amd64 \
 		--build-arg TARGETOS=linux \
 		--build-arg TARGETARCH=amd64 \
-		-t $(IMAGE):linux_amd64 \
-		--output type=docker .
-
-push:
-	docker push $(IMAGE):linux_amd64
+		--output type=docker \
+		--tag quay.io/your-org/test-app:linux_amd64 \
+		.
 
 clean:
-	@rm -rf output/
-	@for p in $(PLATFORMS_LIST); do docker rmi $(IMAGE):$$p || true; done
+	@for platform in $(ALL_PLATFORMS); do \
+		docker rmi $(REGISTRY)/$(IMAGE_NAME):$$platform || true; \
+	done
