@@ -6,7 +6,7 @@ PLATFORMS_LIST = linux-amd64 linux-arm64 darwin-amd64 darwin-arm64 windows-amd64
 
 .DEFAULT_GOAL := build-all
 
-.PHONY: build-all clean $(PLATFORMS_LIST)
+.PHONY: build-all clean image $(PLATFORMS_LIST)
 
 build-all: $(PLATFORMS_LIST)
 
@@ -40,7 +40,6 @@ docker-img:
 multi-image:
 	@for p in $(PLATFORMS_LIST); do \
 		os=$${p%-*}; arch=$${p#*-}; \
-		echo "Собираем docker для $$os/$$arch"; \
 		docker buildx build \
 			--platform=$$os/$$arch \
 			--build-arg TARGETOS=$$os \
@@ -50,10 +49,12 @@ multi-image:
 			. ; \
 	done
 
+image:
+	$(MAKE) multi-image
+
 clean:
 	@for p in $(PLATFORMS_LIST); do \
 		os=$${p%-*}; arch=$${p#*-}; \
 		docker rmi $(REPO)/$(APP):$$os\_$$arch 2>/dev/null || true; \
 	done
 	rm -rf $(ARTIFACTS)
-
