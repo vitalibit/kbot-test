@@ -1,4 +1,4 @@
-FROM quay.io/projectquay/golang:1.22 AS build
+FROM golang:1.22 AS build
 
 WORKDIR /app
 COPY . .
