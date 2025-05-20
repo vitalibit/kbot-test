@@ -1,31 +1,59 @@
-APP=golang
-REGISTRY=quay.io/projectquay
+REPO ?= quay.io/projectquay
+APP ?= test-app
+ARTIFACTS ?= build
 
-PLATFORMS=linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64
+PLATFORMS_LIST = linux-amd64 linux-arm64 darwin-amd64 darwin-arm64 windows-amd64
 
-.PHONY: all clean $(subst /,_,$(PLATFORMS))
+.DEFAULT_GOAL := build-all
 
-$(foreach plat,$(PLATFORMS),$(eval $(subst /,_,${plat}): ; \
-	docker buildx build --platform ${plat} \
-		--build-arg TARGETOS=$(word 1,$(subst /, ,${plat})) \
-		--build-arg TARGETARCH=$(word 2,$(subst /, ,${plat})) \
-		-t $(REGISTRY)/$(APP):$(subst /,_,${plat}) \
-		--output type=docker \
-		--file Dockerfile .))
+.PHONY: build-all clean $(PLATFORMS_LIST)
 
-all: $(subst /,_,${PLATFORMS})
+build-all: $(PLATFORMS_LIST)
 
-image:
+prepare:
+	@mkdir -p $(ARTIFACTS)
+
+linux-amd64:
+	@$(MAKE) docker-img OS=linux ARCH=amd64
+
+linux-arm64:
+	@$(MAKE) docker-img OS=linux ARCH=arm64
+
+darwin-amd64: prepare
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o $(ARTIFACTS)/$(APP)-darwin-amd64 .
+
+darwin-arm64: prepare
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o $(ARTIFACTS)/$(APP)-darwin-arm64 .
+
+windows-amd64: prepare
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o $(ARTIFACTS)/$(APP)-windows-amd64.exe .
+
+docker-img:
 	docker buildx build \
-		--platform linux/amd64 \
-		--build-arg TARGETOS=linux \
-		--build-arg TARGETARCH=amd64 \
-		-t $(REGISTRY)/$(APP):linux_amd64 \
+		--platform=$(OS)/$(ARCH) \
+		--build-arg TARGETOS=$(OS) \
+		--build-arg TARGETARCH=$(ARCH) \
 		--output type=docker \
+		--tag $(REPO)/$(APP):$(OS)_$(ARCH) \
 		.
 
-clean:
-	@rm -rf build/
-	@for platform in $(subst /,_,${PLATFORMS}); do \
-		docker rmi $(REGISTRY)/$(APP):$$platform 2>/dev/null || true; \
+multi-image:
+	@for p in $(PLATFORMS_LIST); do \
+		os=$${p%-*}; arch=$${p#*-}; \
+		echo "Собираем docker для $$os/$$arch"; \
+		docker buildx build \
+			--platform=$$os/$$arch \
+			--build-arg TARGETOS=$$os \
+			--build-arg TARGETARCH=$$arch \
+			--output type=docker \
+			--tag $(REPO)/$(APP):$$os\_$$arch \
+			. ; \
 	done
+
+clean:
+	@for p in $(PLATFORMS_LIST); do \
+		os=$${p%-*}; arch=$${p#*-}; \
+		docker rmi $(REPO)/$(APP):$$os\_$$arch 2>/dev/null || true; \
+	done
+	rm -rf $(ARTIFACTS)
+
