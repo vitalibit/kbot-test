@@ -36,7 +36,8 @@ image:
 		--output type=docker \
 		--tag $(REPO)/$(APP):linux_amd64 \
 		.
-
-clean:
+version:
+	docker buildx version
+clean: version
 	rm -rf $(BINDIR)
 	docker rmi $(REPO)/$(APP):linux_amd64 2>/dev/null || true
