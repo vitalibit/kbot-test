@@ -1,60 +1,42 @@
-REPO ?= quay.io/projectquay
-APP ?= test-app
-ARTIFACTS ?= build
+REPO      ?= quay.io/projectquay
+APP       ?= test-app
+BINDIR    ?= build
 
-PLATFORMS_LIST = linux-amd64 linux-arm64 darwin-amd64 darwin-arm64 windows-amd64
+PLATFORMS = linux-amd64 linux-arm64 darwin-amd64 darwin-arm64 windows-amd64
 
-.DEFAULT_GOAL := build-all
+.DEFAULT_GOAL := all
 
-.PHONY: build-all clean image $(PLATFORMS_LIST)
+.PHONY: all clean $(PLATFORMS) image
 
-build-all: $(PLATFORMS_LIST)
+all: $(PLATFORMS)
 
-prepare:
-	@mkdir -p $(ARTIFACTS)
+$(BINDIR):
+	mkdir -p $(BINDIR)
 
-linux-amd64:
-	@$(MAKE) docker-img OS=linux ARCH=amd64
+linux-amd64: $(BINDIR)
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $(BINDIR)/$(APP)-linux-amd64 .
 
-linux-arm64:
-	@$(MAKE) docker-img OS=linux ARCH=arm64
+linux-arm64: $(BINDIR)
+	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o $(BINDIR)/$(APP)-linux-arm64 .
 
-darwin-amd64: prepare
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o $(ARTIFACTS)/$(APP)-darwin-amd64 .
+darwin-amd64: $(BINDIR)
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o $(BINDIR)/$(APP)-darwin-amd64 .
 
-darwin-arm64: prepare
-	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o $(ARTIFACTS)/$(APP)-darwin-arm64 .
+darwin-arm64: $(BINDIR)
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o $(BINDIR)/$(APP)-darwin-arm64 .
 
-windows-amd64: prepare
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o $(ARTIFACTS)/$(APP)-windows-amd64.exe .
-
-docker-img:
-	docker buildx build \
-		--platform=$(OS)/$(ARCH) \
-		--build-arg TARGETOS=$(OS) \
-		--build-arg TARGETARCH=$(ARCH) \
-		--output type=docker \
-		--tag $(REPO)/$(APP):$(OS)_$(ARCH) \
-		.
-
-multi-image:
-	@for p in $(PLATFORMS_LIST); do \
-		os=$${p%-*}; arch=$${p#*-}; \
-		docker buildx build \
-			--platform=$$os/$$arch \
-			--build-arg TARGETOS=$$os \
-			--build-arg TARGETARCH=$$arch \
-			--output type=docker \
-			--tag $(REPO)/$(APP):$$os\_$$arch \
-			. ; \
-	done
+windows-amd64: $(BINDIR)
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o $(BINDIR)/$(APP)-windows-amd64.exe .
 
 image:
-	$(MAKE) multi-image
+	docker buildx build \
+		--platform=linux/amd64 \
+		--build-arg TARGETOS=linux \
+		--build-arg TARGETARCH=amd64 \
+		--output type=docker \
+		--tag $(REPO)/$(APP):linux_amd64 \
+		.
 
 clean:
-	@for p in $(PLATFORMS_LIST); do \
-		os=$${p%-*}; arch=$${p#*-}; \
-		docker rmi $(REPO)/$(APP):$$os\_$$arch 2>/dev/null || true; \
-	done
-	rm -rf $(ARTIFACTS)
+	rm -rf $(BINDIR)
+	docker rmi $(REPO)/$(APP):linux_amd64 2>/dev/null || true
