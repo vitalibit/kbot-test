@@ -40,4 +40,4 @@ version:
 	docker buildx version
 clean: version
 	rm -rf $(BINDIR)
-	docker rmi $(REPO)/$(APP):linux_amd64 2>/dev/null || true
+	docker rmi $(REPO)/$(APP):linux_amd64
